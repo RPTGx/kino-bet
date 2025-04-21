@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.placeholder-white::placeholder {
+  color: white;
+  opacity: 1;
+}
+
+
+/* Hide number input spinner for all browsers */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner[type="number"] {
+  -moz-appearance: textfield;
+}
+
+
+/* Import Chewy font */
+@font-face {
+  font-family: 'Chewy';
+  src: url('/assets/fonts/Chewy-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --background: #0f0f1a;
+  --foreground: #ffffff;
+  --primary: #4ecca3;
+  --primary-foreground: #ffffff;
+  --secondary: #ff2e63;
+  --secondary-foreground: #ffffff;
+  --accent: #ffd700;
+  --accent-foreground: #000000;
+  --muted: #1a1a2a;
+  --muted-foreground: #ffffff;
+  --border: #2a2a3a;
+}
+
+body {
+  @apply bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2a] to-[#4ecca3] text-foreground min-h-screen;
+  font-family: 'Arial', sans-serif;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  /* Disable text selection to prevent blue highlighting when dragging */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+h1, h2, h3, h4, h5, h6, .chewy, .btn, .game-title {
+  font-family: 'Chewy', cursive !important;
+  letter-spacing: 1.5px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  background: var(--muted);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 10px;
+}
+
+.glow {
+  text-shadow: 0 0 8px var(--accent), 0 0 16px var(--accent);
+}
+
+.card-glass {
+  background: rgba(30, 41, 59, 0.7);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  backdrop-filter: blur(8px);
+  border-radius: 18px;
+  border: 1.5px solid rgba(255,255,255,0.08);
+}
+
+.bounce {
+  transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bounce:active {
+  transform: scale(0.92);
+}
+
+.btn {
+  font-family: 'Chewy', cursive !important;
+  letter-spacing: 1.5px;
+  font-size: 1.1rem;
+  @apply px-5 py-2 rounded-xl shadow-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-primary via-accent to-secondary text-primary-foreground hover:from-accent hover:to-primary focus:ring-primary;
+  box-shadow: 0 2px 16px 0 rgba(255,215,0,0.15);
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-opacity-90 focus:ring-secondary;
+}
+
+.btn-accent {
+  @apply bg-accent text-accent-foreground hover:bg-accent-hover focus:ring-accent;
+}
+
+.input-playful {
+  font-family: 'Chewy', cursive !important;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  color: var(--accent-foreground);
+  font-size: 1.1rem;
+  transition: box-shadow 0.2s;
+  box-shadow: 0 2px 8px 0 rgba(78,204,163,0.06);
+}
+.input-playful:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255,215,0,0.14);
+}
+
+.label-playful {
+  font-family: 'Chewy', cursive !important;
+  color: var(--accent);
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+}
+
+.label-flat {
+  font-family: 'Chewy', cursive !important;
+  color: #FFD600;
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  font-weight: bold;
+  text-shadow: none !important;
+}
+
+/* Playful badge */
+.badge-playful {
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  color: var(--primary-foreground);
+  font-family: 'Chewy', cursive !important;
+  border-radius: 10px;
+  padding: 0.2em 0.7em;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  box-shadow: 0 1px 6px 0 rgba(255,46,99,0.12);
+}
+
+/* Playful shadow for cards */
+.card-shadow {
+  box-shadow: 0 6px 24px 0 rgba(78,204,163,0.18);
+}
+
+/* Add a subtle animated background pattern */
+.animated-bg {
+  background: repeating-linear-gradient(135deg,rgba(255,255,255,0.02) 0 2px,transparent 2px 20px), linear-gradient(135deg, var(--background), var(--muted));
+  animation: bg-move 8s linear infinite;
+}
+
+/* More pronounced animated background for game container */
+.game-container-bg {
+  background: repeating-linear-gradient(135deg,rgba(59, 59, 90, 0.15) 0 2px,transparent 2px 20px), linear-gradient(135deg, #0f0f1a, #171724);
+  animation: bg-move 6s linear infinite;
+  border: 1.5px solid rgba(255,255,255,0.08);
+}
+
+@keyframes bg-move {
+  0% {background-position: 0 0, 0 0;}
+  100% {background-position: 40px 40px, 0 0;}
+}
+
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary-hover focus:ring-primary;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-opacity-90 focus:ring-secondary;
+  }
+  
+  .btn-accent {
+    @apply bg-accent text-accent-foreground hover:bg-accent-hover focus:ring-accent;
+  }
+  
+  /* Targeted vehicle styles */
+  .targeted-vehicle {
+    @apply z-20; /* Higher z-index to appear above other vehicles */
+  }
+  
+  .targeted-vehicle-img {
+    @apply drop-shadow-[0_0_8px_rgba(255,0,0,0.8)] brightness-110 saturate-150;
+    filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.8)) brightness(110%) saturate(150%);
+  }
+  
+  /* Animation for targeted vehicles */
+  @keyframes pulse-red {
+    0%, 100% {
+      filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.8)) brightness(110%) saturate(150%);
+    }
+    50% {
+      filter: drop-shadow(0 0 16px rgba(255, 0, 0, 0.9)) brightness(120%) saturate(180%);
+    }
+  }
+  
+  .animate-pulse {
+    animation: pulse-red 1s ease-in-out infinite;
+  }
+}
