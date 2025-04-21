@@ -36,6 +36,8 @@ export interface GameState {
   }; // Result from blockchain transaction
 }
 
+export type KinoAnimationState = 'idle' | 'walking' | 'static';
+
 export interface GameBoardProps {
   currentLane: number;
   difficulty: DifficultyType;
@@ -45,6 +47,8 @@ export interface GameBoardProps {
   targetLane: number; // The lane the player has selected to go to
   laneSelected: boolean; // Whether the player has selected a lane
   isGameOver: boolean; // Whether the game is over
+  isSigningTransaction?: boolean; // Whether the player is currently signing a transaction
+  kinoAnimationState?: KinoAnimationState; // Explicitly control Kino's animation state
 }
 
 export interface GameControlsProps {

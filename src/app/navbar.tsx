@@ -7,9 +7,10 @@ interface NavbarProps {
   account: string | null;
   onConnect: (account: string, provider: ethers.providers.Web3Provider) => void;
   onError: (error: Error) => void;
+  onDisconnect?: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ account, onConnect, onError }) => {
+const Navbar: React.FC<NavbarProps> = ({ account, onConnect, onError, onDisconnect }) => {
   return (
     <nav className="w-full bg-gradient-to-b from-gray-900 to-gray-800/90 border-b border-gray-700/50 py-3 px-4 sm:px-6 shadow-md sticky top-0 z-50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto">
@@ -29,13 +30,8 @@ const Navbar: React.FC<NavbarProps> = ({ account, onConnect, onError }) => {
           </div>
 
           {/* Right Side: Wallet Connection/Info */}
-          <div className="flex items-center">
-            {!account ? (
-              <ConnectMetaMaskButton 
-                onConnect={onConnect}
-                onError={onError}
-              />
-            ) : (
+          <div className="flex items-center space-x-3">
+            {account && (
               <div className="flex items-center space-x-2 card-glass px-4 py-2 rounded-xl text-base shadow-lg border border-accent/40">
                 <span className="block w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Connected"></span>
                 <span className="chewy text-accent font-bold tracking-wider">
@@ -43,6 +39,12 @@ const Navbar: React.FC<NavbarProps> = ({ account, onConnect, onError }) => {
                 </span>
               </div>
             )}
+            <ConnectMetaMaskButton 
+              onConnect={onConnect}
+              onError={onError}
+              onDisconnect={onDisconnect}
+              isConnected={!!account}
+            />
           </div>
         </div>
       </div>

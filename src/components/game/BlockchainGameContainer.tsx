@@ -66,6 +66,15 @@ export default function BlockchainGameContainer() {
   // State to track if we're loading the game result
   const [isLoadingResult, setIsLoadingResult] = useState(false);
 
+  // Add a state variable for tracking retry attempts
+  const [isRetrying, setIsRetrying] = useState(false);
+  
+  // Add a state variable to track if we're in transaction signing phase
+  const [isSigningTransaction, setIsSigningTransaction] = useState(false);
+  
+  // Add a state variable to explicitly control Kino's animation
+  const [kinoAnimationState, setKinoAnimationState] = useState<'idle' | 'walking' | 'static'>('idle');
+
   // Update balance from MetaMask
   useEffect(() => {
     if (metaMaskAccount && metaMaskBalance) {
@@ -76,18 +85,66 @@ export default function BlockchainGameContainer() {
     }
   }, [metaMaskAccount, metaMaskBalance, setGameState]);
 
-  // Clean up auto-walk timer when component unmounts
+  // Set up periodic balance refresh and clean up timers when component unmounts
   useEffect(() => {
+    // Set up periodic balance refresh (every 30 seconds)
+    let balanceRefreshInterval: NodeJS.Timeout | null = null;
+    
+    if (metaMaskAccount && metaMaskProvider) {
+      // Initial balance fetch
+      fetchTokenBalance();
+      
+      // Set up interval for periodic balance refresh
+      balanceRefreshInterval = setInterval(() => {
+        fetchTokenBalance();
+      }, 30000); // Refresh every 30 seconds
+    }
+    
+    // Clean up function
     return () => {
+      // Clear balance refresh interval
+      if (balanceRefreshInterval) {
+        clearInterval(balanceRefreshInterval);
+      }
+      
+      // Clear auto-walk timer
       if (autoWalkTimerRef.current) {
         clearInterval(autoWalkTimerRef.current);
         autoWalkTimerRef.current = null;
       }
     };
-  }, [autoWalkTimerRef]);
+  }, [metaMaskAccount, metaMaskProvider, autoWalkTimerRef]);
 
 
 
+  // Function to fetch the current token balance
+  const fetchTokenBalance = async () => {
+    if (!metaMaskAccount || !metaMaskProvider) {
+      console.log('Cannot fetch balance: No MetaMask connection');
+      return;
+    }
+    
+    try {
+      // Get token balance
+      const tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, metaMaskProvider);
+      const balance = await tokenContract.balanceOf(metaMaskAccount);
+      const formattedBalance = ethers.utils.formatEther(balance);
+      console.log('Fetched token balance:', formattedBalance);
+      
+      // Update balance state
+      setMetaMaskBalance(formattedBalance);
+      setGameState(prev => ({
+        ...prev,
+        balance: parseFloat(formattedBalance)
+      }));
+      
+      return formattedBalance;
+    } catch (error) {
+      console.error('Error fetching token balance:', error);
+      return null;
+    }
+  };
+  
   // Handle successful MetaMask connection
   const handleMetaMaskConnect = async (account: string, provider: ethers.providers.Web3Provider) => {
     setMetaMaskAccount(account);
@@ -112,6 +169,28 @@ export default function BlockchainGameContainer() {
         message: "Connected to MetaMask, but failed to get token balance."
       }));
     }
+  };
+  
+  // Handle MetaMask disconnect
+  const handleMetaMaskDisconnect = () => {
+    // Reset all MetaMask-related state
+    setMetaMaskAccount(null);
+    setMetaMaskProvider(null);
+    setMetaMaskBalance('0');
+    
+    // Update game state
+    setGameState(prev => ({
+      ...prev,
+      message: "Disconnected from MetaMask",
+      balance: 0
+    }));
+    
+    // Clear any cached provider data
+    if (window.ethereum && (window.ethereum as any).removeAllListeners) {
+      (window.ethereum as any).removeAllListeners();
+    }
+    
+    console.log('Successfully signed out from MetaMask');
   };
   
   // Handle MetaMask connection error
@@ -388,20 +467,32 @@ export default function BlockchainGameContainer() {
           collisionCheckInProgressRef.current = true;
           
           try {
-            // First pause on the current lane (0.5 seconds)
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Force static pose when paused on a lane
+            setKinoAnimationState('static');
+            
+            // First pause on the current lane (0.8 seconds) - increased for more noticeable pause
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             // Skip if game is already over
             if (gameState.isGameOver) {
               return;
             }
-
+            
+            // Set walking animation before moving to next lane
+            setKinoAnimationState('walking');
+            
             // Update the game state to move to the next lane
             setGameState(prev => ({
               ...prev,
               currentLane: nextLane,
               multiplier: newMultiplier
             }));
+            
+            // Keep walking animation for a bit longer after reaching the lane
+            await new Promise(resolve => setTimeout(resolve, 400));
+            
+            // Now set to static pose after walking animation has played longer
+            setKinoAnimationState('static');
           } finally {
             // Reset flag when done, regardless of outcome
             collisionCheckInProgressRef.current = false;
@@ -447,6 +538,16 @@ export default function BlockchainGameContainer() {
       return;
     }
     
+    // Set signing transaction state to true but keep gameActive false
+    // This allows us to show the idle animation during transaction signing
+    setIsSigningTransaction(true);
+    // Set Kino to idle animation during transaction signing
+    setKinoAnimationState('idle');
+    setGameState(prev => ({
+      ...prev,
+      message: "Preparing transaction..."
+    }));
+    
     try {
       // Show loading message to the user
       setGameState(prev => ({
@@ -462,7 +563,9 @@ export default function BlockchainGameContainer() {
         message: "Approving tokens..."
       }));
       
-      // Approve tokens for the game
+      // Still in signing phase
+      
+      // Approve tokens for the game if needed
       try {
         // Create a provider using window.ethereum
         // Now properly typed with our declaration file
@@ -473,24 +576,40 @@ export default function BlockchainGameContainer() {
         const signer = provider.getSigner();
         const tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
         
-        setGameState(prev => ({
-          ...prev,
-          message: "Approving tokens..."
-        }));
+        // Set a large approval amount to avoid frequent approvals
+        const largeApprovalAmount = ethers.utils.parseEther("10000000");
         
-        // Always approve the exact amount needed for this game
-        const approvalTx = await tokenContract.approve(GAME_ADDRESS, betAmountInTokenUnits);
+        // Check current allowance before requesting approval
+        const userAddress = await signer.getAddress();
+        const currentAllowance = await tokenContract.allowance(userAddress, GAME_ADDRESS);
         
-        // Add a delay after approval to ensure it's confirmed before proceeding
-        setGameState(prev => ({
-          ...prev,
-          message: "Waiting for approval confirmation..."
-        }));
-        
-        // Wait for approval transaction to be mined
-        await approvalTx.wait();
-        
-        console.log('Token approval successful for amount:', ethers.utils.formatEther(betAmountInTokenUnits));
+        // Only request approval if current allowance is less than the bet amount
+        if (currentAllowance.lt(betAmountInTokenUnits)) {
+          console.log('Current allowance insufficient:', ethers.utils.formatEther(currentAllowance));
+          console.log('Requesting approval for:', ethers.utils.formatEther(largeApprovalAmount));
+          
+          setGameState(prev => ({
+            ...prev,
+            message: "Approving tokens..."
+          }));
+          
+          const approvalTx = await tokenContract.approve(GAME_ADDRESS, largeApprovalAmount);
+          
+          // Add a delay after approval to ensure it's confirmed before proceeding
+          setGameState(prev => ({
+            ...prev,
+            message: "Waiting for approval confirmation..."
+          }));
+          
+          // Wait for approval transaction to be mined
+          await approvalTx.wait();
+          
+          console.log('Token approval successful for large amount:', ethers.utils.formatEther(largeApprovalAmount));
+          
+          // Still in signing phase
+        } else {
+          console.log('Sufficient allowance already exists:', ethers.utils.formatEther(currentAllowance));
+        }
       } catch (approvalError: unknown) {
         const errorMessage = approvalError instanceof Error ? approvalError.message : String(approvalError);
         setGameState(prev => ({
@@ -505,6 +624,8 @@ export default function BlockchainGameContainer() {
         ...prev,
         message: "Starting game on blockchain..."
       }));
+      
+      // Still in signing phase
       
       // Validate parameters before sending transaction
       if (gameState.targetLane <= 0) {
@@ -555,6 +676,15 @@ export default function BlockchainGameContainer() {
         txHash = tx.hash;
         console.log('Game transaction submitted:', txHash);
         
+        // Now we're done with signing, set gameActive to true and signing to false
+        setIsSigningTransaction(false);
+        // Set Kino to static pose when game starts
+        setKinoAnimationState('static');
+        setGameState(prev => ({
+          ...prev,
+          gameActive: true
+        }));
+        
         // Wait for transaction to be mined
         const receipt = await tx.wait();
         console.log('Transaction confirmed in block:', receipt.blockNumber);
@@ -569,6 +699,9 @@ export default function BlockchainGameContainer() {
           if (result) {
             // Use the existing playGameAnimation function that's defined in this component
             playGameAnimation(result);
+            
+            // Refresh the token balance after game
+            setTimeout(() => fetchTokenBalance(), 3000);
           }
         } catch (resultError) {
           console.error('Error fetching or playing game result:', resultError);
@@ -590,6 +723,25 @@ export default function BlockchainGameContainer() {
             errorMsg = "Insufficient funds to start game";
           } else if (txError.message.includes('Failed to initialize request')) {
             errorMsg = "RPC connection error. Please try again later";
+          } else if (txError.message.includes('CALL_EXCEPTION')) {
+            // Handle the specific CALL_EXCEPTION error
+            errorMsg = "Contract call failed. This could be due to network issues or contract state. Please try again.";
+            console.log("CALL_EXCEPTION details:", txError);
+            
+            // Automatically retry once after a short delay for CALL_EXCEPTION errors
+            if (!isRetrying) {
+              setIsRetrying(true);
+              setGameState(prev => ({ ...prev, message: "Transaction failed. Retrying..." }));
+              
+              // Wait 3 seconds before retrying
+              setTimeout(() => {
+                setIsRetrying(false);
+                startGame(); // Retry the transaction
+                return; // Exit this error handler after scheduling retry
+              }, 3000);
+              
+              return; // Don't throw error since we're retrying
+            }
           } else {
             errorMsg = `Transaction error: ${txError.message.substring(0, 100)}`;
           }
@@ -602,14 +754,19 @@ export default function BlockchainGameContainer() {
       const errorMessage = error instanceof Error ? error.message : String(error);
       setGameState(prev => ({
         ...prev,
+        gameActive: false, // Reset gameActive if there's an error
         message: `Error: ${errorMessage}`
       }));
+      setIsSigningTransaction(false); // Reset signing transaction state
+      setKinoAnimationState('idle'); // Reset Kino animation state
       alert(`Error starting game: ${errorMessage}`);
     }
   };
 
   // Function to just replay the last game without starting a new one
   const replayLastGame = async () => {
+    // Set Kino to static pose before starting replay
+    setKinoAnimationState('static');
     const result = await fetchLastGameResult();
     if (result) {
       playGameAnimation(result);
@@ -628,6 +785,7 @@ export default function BlockchainGameContainer() {
         account={metaMaskAccount}
         onConnect={handleMetaMaskConnect}
         onError={handleMetaMaskError}
+        onDisconnect={handleMetaMaskDisconnect}
       />
       <div className="w-full flex flex-col items-center mt-6 mb-16"> {/* Added bottom margin for music player */}
         <div className="w-full max-w-6xl bg-gray-900 rounded-lg shadow-lg overflow-hidden">
@@ -649,6 +807,8 @@ export default function BlockchainGameContainer() {
             targetLane={gameState.targetLane}
             laneSelected={gameState.laneSelected}
             isGameOver={gameState.isGameOver}
+            isSigningTransaction={isSigningTransaction}
+            kinoAnimationState={kinoAnimationState}
           />
           
           {/* Game Over Message */}

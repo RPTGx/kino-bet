@@ -63,14 +63,14 @@ export default function GameControls({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3 divide-y md:divide-y-0 md:divide-x divide-gray-700/50">
         {/* Bet Section */}
         <div className="space-y-1 pr-0 md:pr-3 py-1 md:py-0 first:pt-0 last:pb-0">
-          <h3 className="label-flat text-base mb-1">Bet Amount</h3>
-          <div className="flex items-center mt-0 w-full">
-            <div className="relative flex-grow rounded-l-md overflow-hidden border border-gray-700 bg-[#19192b]">
+          <h3 className="text-[#FFD700] text-base mb-1 font-bold">Bet Amount</h3>
+          <div className="flex items-center mt-0 w-full h-10">
+            <div className="relative flex-grow rounded-l-md overflow-hidden border border-gray-700 bg-[#19192b] h-full">
               <input
                 type="number"
-                value={betAmount}
+                value={betAmount || ''}
                 onChange={handleBetChange}
-                className="w-full text-left text-sm py-1.5 px-2 pr-10 bg-transparent border-none focus:ring-0 no-spinner text-white placeholder-white h-full"
+                className="w-full text-left text-sm py-0 px-2 pr-10 bg-transparent border-none focus:ring-0 no-spinner text-white placeholder-white h-full"
                 min={0}
                 step={0.01}
                 placeholder="Enter bet..."
@@ -81,8 +81,8 @@ export default function GameControls({
             <div className="flex rounded-r-md overflow-hidden border border-gray-700 border-l-0 bg-[#232347] h-full">
               <button
                 type="button"
-                className={`px-2 py-1.5 text-xs font-semibold bg-transparent text-white border-0 rounded-none ${!gameActive && !isGameOver ? 'hover:bg-[#2f2f4d]' : 'opacity-50 cursor-not-allowed'} transition-all duration-100 h-full flex items-center justify-center focus:outline-none ${!gameActive && !isGameOver ? 'active:bg-[#1a1a3a] active:transform active:scale-95 active:translate-y-0.5' : ''}`}
-                style={{ fontFamily: 'inherit', minWidth: 24 }}
+                className={`px-2 py-0 text-sm font-semibold bg-transparent text-white border-0 rounded-none ${!gameActive && !isGameOver ? 'hover:bg-[#2f2f4d]' : 'opacity-50 cursor-not-allowed'} transition-all duration-100 h-full flex items-center justify-center focus:outline-none ${!gameActive && !isGameOver ? 'active:bg-[#1a1a3a] active:transform active:scale-95 active:translate-y-0.5' : ''}`}
+                style={{ fontFamily: 'inherit', minWidth: 32 }}
                 onClick={() => !gameActive && !isGameOver && handleBetAdjust(2)}
                 disabled={gameActive || isGameOver}
               >
@@ -90,8 +90,8 @@ export default function GameControls({
               </button>
               <button
                 type="button"
-                className={`px-2 py-1.5 text-xs font-semibold bg-transparent text-white border-0 rounded-none ${!gameActive && !isGameOver ? 'hover:bg-[#2f2f4d]' : 'opacity-50 cursor-not-allowed'} transition-all duration-100 border-l border-gray-700 h-full flex items-center justify-center focus:outline-none ${!gameActive && !isGameOver ? 'active:bg-[#1a1a3a] active:transform active:scale-95 active:translate-y-0.5' : ''}`}
-                style={{ fontFamily: 'inherit', minWidth: 24 }}
+                className={`px-2 py-0 text-sm font-semibold bg-transparent text-white border-0 rounded-none ${!gameActive && !isGameOver ? 'hover:bg-[#2f2f4d]' : 'opacity-50 cursor-not-allowed'} transition-all duration-100 border-l border-gray-700 h-full flex items-center justify-center focus:outline-none ${!gameActive && !isGameOver ? 'active:bg-[#1a1a3a] active:transform active:scale-95 active:translate-y-0.5' : ''}`}
+                style={{ fontFamily: 'inherit', minWidth: 32 }}
                 onClick={() => !gameActive && !isGameOver && handleBetAdjust(5)}
                 disabled={gameActive || isGameOver}
               >
@@ -99,8 +99,8 @@ export default function GameControls({
               </button>
               <button
                 type="button"
-                className={`px-2 py-1.5 text-xs font-semibold bg-transparent text-white border-0 rounded-none ${!gameActive && !isGameOver ? 'hover:bg-[#2f2f4d]' : 'opacity-50 cursor-not-allowed'} transition-all duration-100 border-l border-gray-700 h-full flex items-center justify-center focus:outline-none ${!gameActive && !isGameOver ? 'active:bg-[#1a1a3a] active:transform active:scale-95 active:translate-y-0.5' : ''}`}
-                style={{ fontFamily: 'inherit', minWidth: 24 }}
+                className={`px-2 py-0 text-sm font-semibold bg-transparent text-white border-0 rounded-none ${!gameActive && !isGameOver ? 'hover:bg-[#2f2f4d]' : 'opacity-50 cursor-not-allowed'} transition-all duration-100 border-l border-gray-700 h-full flex items-center justify-center focus:outline-none ${!gameActive && !isGameOver ? 'active:bg-[#1a1a3a] active:transform active:scale-95 active:translate-y-0.5' : ''}`}
+                style={{ fontFamily: 'inherit', minWidth: 32 }}
                 onClick={() => !gameActive && !isGameOver && handleBetAdjust(10)}
                 disabled={gameActive || isGameOver}
               >
@@ -111,16 +111,16 @@ export default function GameControls({
         </div>
 
         {/* Difficulty Section */}
-        <div className="space-y-1 px-0 md:px-3 py-1 md:py-0 first:pt-0 last:pb-0 flex flex-col items-center">
-          <h3 className="label-playful text-base mb-1">Difficulty</h3>
-          <div className="flex w-full justify-center items-center mt-0">
-            <div className="flex rounded-md overflow-hidden border border-gray-700 bg-[#19192b] w-full max-w-md">
+        <div className="space-y-1 px-0 md:px-3 py-1 md:py-0 first:pt-0 last:pb-0">
+          <h3 className="text-[#FFD700] text-base mb-1 font-bold">Difficulty</h3>
+          <div className="flex items-center mt-0 w-full h-10">
+            <div className="flex rounded-md overflow-hidden border border-gray-700 bg-[#19192b] w-full h-full">
               {["easy", "medium", "hard", "daredevil"].map((level, idx) => (
                 <button
                   key={level}
                   type="button"
-                  className={`flex-1 px-0 py-1 text-xs font-semibold rounded-none focus:z-10 focus:outline-none transition-colors duration-100 ${difficulty === level ? "bg-[#ffd700] text-black" : "bg-transparent text-white ${!gameActive && !isGameOver ? 'hover:bg-[#232347]' : ''}"} ${idx === 0 ? "rounded-l-md" : "border-l border-gray-700/90"} ${idx === 3 ? "rounded-r-md" : ""} ${gameActive || isGameOver ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  style={{ fontFamily: 'inherit', minWidth: 0 }}
+                  className={`flex-1 px-0 py-0 text-sm font-semibold rounded-none focus:z-10 focus:outline-none transition-colors duration-100 ${difficulty === level ? "bg-[#ffd700] text-black" : "bg-transparent text-white ${!gameActive && !isGameOver ? 'hover:bg-[#232347]' : ''}"} ${idx === 0 ? "rounded-l-md" : "border-l border-gray-700/90"} ${idx === 3 ? "rounded-r-md" : ""} ${gameActive || isGameOver ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{ fontFamily: 'inherit', minWidth: 0, height: '100%' }}
                   onClick={() => {
                     if (!gameActive && !isGameOver) {
                       playClickSound();
@@ -165,12 +165,7 @@ export default function GameControls({
 
           {/* No cash out button needed - winnings are automatically sent to wallet */}
 
-          {gameActive && (
-            <div className="mt-3 text-center text-sm text-gray-300 bg-gray-700/30 p-3 rounded-md border border-gray-600/50">
-              <p>Click the next lane to advance!</p>
-              <p className="text-primary font-semibold text-base mt-1">Current multiplier: {multiplier.toFixed(2)}x</p>
-            </div>
-          )}
+          {/* Game active info removed as requested */}
 
           {!gameActive && !isGameOver && betAmount <= 0 && (
             <p className="text-center text-xs text-yellow-400/80 mt-2">Enter a bet amount to start.</p>

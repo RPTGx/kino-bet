@@ -4,12 +4,16 @@ import { ethers } from 'ethers';
 interface ConnectMetaMaskButtonProps {
   onConnect: (account: string, provider: ethers.providers.Web3Provider) => void;
   onError: (error: Error) => void;
+  onDisconnect?: () => void;
+  isConnected?: boolean;
   className?: string;
 }
 
 export const ConnectMetaMaskButton: React.FC<ConnectMetaMaskButtonProps> = ({ 
   onConnect, 
   onError,
+  onDisconnect,
+  isConnected = false,
   className = ''
 }) => {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -40,13 +44,27 @@ export const ConnectMetaMaskButton: React.FC<ConnectMetaMaskButtonProps> = ({
     }
   };
 
+  const handleDisconnect = () => {
+    if (onDisconnect) {
+      onDisconnect();
+    }
+  };
+
+  const handleClick = () => {
+    if (isConnected) {
+      handleDisconnect();
+    } else {
+      handleConnect();
+    }
+  };
+
   return (
     <button 
-      onClick={handleConnect} 
+      onClick={handleClick} 
       disabled={isConnecting}
-      className={`px-4 py-2 bg-[#FF9E0D] text-white rounded-lg hover:bg-[#F5A623] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center chewy ${className}`}
+      className={`px-4 py-2 ${isConnected ? 'bg-red-600 hover:bg-red-700' : 'bg-[#FF9E0D] hover:bg-[#F5A623]'} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center chewy ${className}`}
     >
-      {isConnecting ? 'Connecting...' : 'Connect MetaMask'}
+      {isConnecting ? 'Connecting...' : isConnected ? 'Sign Out' : 'Connect MetaMask'}
     </button>
   );
 };

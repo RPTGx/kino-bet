@@ -31,7 +31,10 @@ export default function Lane({
           : `url('/assets/lanes/lane.png')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
+        backgroundRepeat: 'no-repeat',
+        marginLeft: '-1px', // Negative margin to eliminate gaps between lanes
+        marginRight: '-1px', // Negative margin to eliminate gaps between lanes
+        boxSizing: 'border-box' // Ensure padding and borders are included in width calculation
       }}
     >
 

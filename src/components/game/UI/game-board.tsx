@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Lane from "./lane";
 import { GameBoardProps, VehicleObstacle } from "../types";
@@ -21,13 +21,25 @@ export default function GameBoard({
   difficultySettings,
   targetLane,
   laneSelected,
-  isGameOver
+  isGameOver,
+  isSigningTransaction = false, // Default to false if not provided
+  kinoAnimationState // Explicitly control Kino's animation state
 }: GameBoardProps) {
   // Auto-follow camera position (used during gameplay)
   const [playerCameraPosition, setPlayerCameraPosition] = useState(0);
   
   // Manual camera position (used for lane selection before game starts)
   const [manualCameraPosition, setManualCameraPosition] = useState(0);
+  
+  // Track when Kino is moving between lanes
+  const [isMoving, setIsMoving] = useState(false);
+  const [prevLane, setPrevLane] = useState(0);
+  
+  // Track animation state - use prop if provided, otherwise manage internally
+  const [internalAnimationState, setInternalAnimationState] = useState<'idle' | 'static' | 'walking'>('idle');
+  
+  // The actual animation state to use - prefer the prop if provided
+  const animationState = kinoAnimationState || internalAnimationState;
   
   // Track visible lane range for UI indicators
   const [visibleLaneRange, setVisibleLaneRange] = useState({ start: 0, end: 3 });
@@ -189,6 +201,39 @@ export default function GameBoard({
     }
   }, [currentLane, gameActive]);
   
+  // Only update internal animation state if kinoAnimationState prop is not provided
+  useEffect(() => {
+    // Skip if using external animation state
+    if (kinoAnimationState) return;
+    
+    // When not active or during transaction signing, show idle animation
+    if (!gameActive || isSigningTransaction) {
+      setInternalAnimationState('idle');
+      return;
+    }
+    
+    // During gameplay
+    if (gameActive) {
+      // Check if currentLane is an integer (indicating we're on a lane)
+      const isOnLane = Number.isInteger(currentLane);
+      
+      if (isOnLane) {
+        // We're on a lane - show static pose
+        setInternalAnimationState('static');
+        setIsMoving(false);
+        
+        // Update previous lane
+        if (prevLane !== currentLane) {
+          setPrevLane(currentLane);
+        }
+      } else {
+        // We're moving between lanes - show walking animation
+        setInternalAnimationState('walking');
+        setIsMoving(true);
+      }
+    }
+  }, [currentLane, gameActive, isSigningTransaction, prevLane, kinoAnimationState]);
+  
   // Function to scroll camera left (only for manual camera)
   const scrollCameraLeft = () => {
     // Don't allow scrolling past the start
@@ -204,21 +249,35 @@ export default function GameBoard({
     setVisibleLaneRange({ start: startLane, end: endLane });
   };
   
-  // Function to scroll camera right (only for manual camera)
-  const scrollCameraRight = () => {
-    // Don't allow scrolling past the end
-    const maxScroll = (difficultySettings.totalLanes - 2) * 150;
-    if (manualCameraPosition >= maxScroll) return;
-    
-    // Scroll by one lane (150px)
-    const newPosition = Math.min(maxScroll, manualCameraPosition + 150);
-    setManualCameraPosition(newPosition);
-    
-    // Update visible lane range for the manual camera
-    const startLane = Math.floor(newPosition / 150);
-    const endLane = startLane + 3;
-    setVisibleLaneRange({ start: startLane, end: endLane });
+  // --- NEW LOGIC for maxScroll ---
+const scrollContainerRef = useRef<HTMLDivElement>(null);
+const [containerWidth, setContainerWidth] = useState(450); // Default 3 lanes
+useEffect(() => {
+  if (scrollContainerRef.current) {
+    setContainerWidth(scrollContainerRef.current.offsetWidth);
+  }
+  const handleResize = () => {
+    if (scrollContainerRef.current) {
+      setContainerWidth(scrollContainerRef.current.offsetWidth);
+    }
   };
+  window.addEventListener('resize', handleResize);
+  return () => window.removeEventListener('resize', handleResize);
+}, []);
+const laneWidth = 150;
+const totalLanesWithStartEnd = difficultySettings.totalLanes + 2;
+const maxScroll = Math.max(0, totalLanesWithStartEnd * laneWidth - containerWidth);
+// ---
+// Function to scroll camera right (only for manual camera)
+const scrollCameraRight = () => {
+  if (manualCameraPosition >= maxScroll) return;
+  const newPosition = Math.min(maxScroll, manualCameraPosition + laneWidth);
+  setManualCameraPosition(newPosition);
+  // Update visible lane range for the manual camera
+  const startLane = Math.floor(newPosition / laneWidth);
+  const endLane = startLane + Math.floor(containerWidth / laneWidth);
+  setVisibleLaneRange({ start: startLane, end: endLane });
+};
   
   // Generate vehicles periodically (only in demo mode when game is not active)
   useEffect(() => {
@@ -366,21 +425,26 @@ export default function GameBoard({
       // Define eligible lanes based on player's current position
       let eligibleLanes: number[] = [];
       
-      // 2-3 lanes ahead of player (if they exist)
-      for (let i = 2; i <= 3; i++) {
+      // Include more lanes ahead of player (up to 5 lanes ahead if they exist)
+      for (let i = 1; i <= 5; i++) {
         const aheadLane = currentLane + i;
         if (aheadLane <= difficultySettings.totalLanes) {
           eligibleLanes.push(aheadLane);
         }
       }
       
-      // 20% chance to spawn 1 lane before the player
-      if (Math.random() < 0.2) {
-        const beforeLane = currentLane - 1;
-        if (beforeLane > 0) { // Make sure it's a valid lane
-          eligibleLanes.push(beforeLane);
+      // Include lanes to the sides of the player's current lane
+      // 60% chance to spawn 1-2 lanes before the player
+      if (Math.random() < 0.6) {
+        for (let i = 1; i <= 2; i++) {
+          const beforeLane = currentLane - i;
+          if (beforeLane > 0) { // Make sure it's a valid lane
+            eligibleLanes.push(beforeLane);
+          }
         }
       }
+      
+      // We focus on spawning cars in lanes near the player
       
       // If no eligible lanes, skip this spawn cycle
       if (eligibleLanes.length === 0) return;
@@ -421,10 +485,11 @@ export default function GameBoard({
       
       // console.log(`Prop vehicle spawned on lane ${randomLane}`);
       
-    }, difficulty === "daredevil" ? 200 : 
-       difficulty === "hard" ? 300 : 
-       difficulty === "medium" ? 400 : 
-       500);
+    // Increase spawn frequency to populate more lanes
+    }, difficulty === "daredevil" ? 150 : 
+       difficulty === "hard" ? 200 : 
+       difficulty === "medium" ? 300 : 
+       400);
     
     return () => clearInterval(propVehicleInterval);
   }, [gameActive, difficultySettings.totalLanes, difficulty, nextPropVehicleId, currentLane]);
@@ -535,7 +600,7 @@ export default function GameBoard({
     const newPosition = Math.max(
       0, 
       Math.min(
-        (difficultySettings.totalLanes - 2) * 150, // Max scroll position
+        maxScroll, // Use new maxScroll based on container width
         dragStartCameraPos - dragDistance // Move camera opposite to drag direction
       )
     );
@@ -571,6 +636,7 @@ export default function GameBoard({
       
       <div 
         className="relative h-[500px] z-10 overflow-hidden"
+        ref={scrollContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -642,14 +708,35 @@ export default function GameBoard({
             transition={{
               // Use linear easing for smooth walking across the lane
               duration: 0.5, 
-              ease: "linear"
+              ease: "linear",
+              // Only update animation if kinoAnimationState prop is not provided
+              onUpdate: (latest: { left?: number | string }) => {
+                // Skip if using external animation state
+                if (kinoAnimationState) return;
+                
+                // If we're in gameplay and not at an integer position, we're moving
+                if (gameActive && !isSigningTransaction) {
+                  const currentPos = latest.left as number;
+                  const lanePos = Math.round(currentPos / 150) * 150 + 50;
+                  const isAtLaneCenter = Math.abs(currentPos - lanePos) < 5;
+                  
+                  if (isAtLaneCenter) {
+                    // We're at a lane center - force static pose
+                    setInternalAnimationState('static');
+                  } else {
+                    // We're moving between lanes
+                    setInternalAnimationState('walking');
+                  }
+                }
+              }
             }}
           >
             <img 
               src={
-                !gameActive ? '/assets/Kino_Idle_HD.gif' :
-                currentLane === targetLane ? '/assets/Kino_Static.png' : 
-                '/assets/Kino_Walk_HD.gif'
+                // Use the animation state to determine which image to show
+                animationState === 'idle' ? '/assets/Kino_Idle_HD.gif' :
+                animationState === 'walking' ? '/assets/Kino_Walk_HD.gif' :
+                '/assets/Kino_Static.png'
               }
               alt="Kino character"
               className="w-full h-full object-contain"
@@ -673,21 +760,7 @@ export default function GameBoard({
           </div>
         )}
         
-        {/* Lane visibility indicators */}
-        <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-1 z-20">
-          {Array.from({ length: difficultySettings.totalLanes }, (_, i) => {
-            const laneNumber = i + 1;
-            const isVisible = laneNumber >= visibleLaneRange.start && laneNumber <= visibleLaneRange.end;
-            
-            return (
-              <div 
-                key={`indicator-${laneNumber}`}
-                className={`w-2 h-2 rounded-full transition-all ${isVisible ? 'bg-primary' : 'bg-gray-500'} ${laneNumber === currentLane ? 'w-3 h-3' : ''}`}
-                title={`Lane ${laneNumber}`}
-              />
-            );
-          })}
-        </div>
+        {/* Lane visibility indicators removed */}
       </div>
     </div>
   );
