@@ -1,5 +1,5 @@
 import React from 'react';
-import { ConnectMetaMaskButton } from '@/components/wallet/connect-metamask-button';
+import { ConnectButton } from '@/components/wallet/connect-button';
 import { ethers } from 'ethers';
 import Link from 'next/link'; // Keep Link import in case 'Game Rules' becomes a link
 
@@ -39,7 +39,7 @@ const Navbar: React.FC<NavbarProps> = ({ account, onConnect, onError, onDisconne
                 </span>
               </div>
             )}
-            <ConnectMetaMaskButton 
+            <ConnectButton 
               onConnect={onConnect}
               onError={onError}
               onDisconnect={onDisconnect}

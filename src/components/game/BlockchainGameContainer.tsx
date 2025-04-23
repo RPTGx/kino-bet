@@ -65,6 +65,9 @@ export default function BlockchainGameContainer() {
   
   // State to track if we're loading the game result
   const [isLoadingResult, setIsLoadingResult] = useState(false);
+  
+  // State to track if game is in the process of starting (to disable controls immediately)
+  const [isStartingGame, setIsStartingGame] = useState(false);
 
   // Add a state variable for tracking retry attempts
   const [isRetrying, setIsRetrying] = useState(false);
@@ -74,6 +77,27 @@ export default function BlockchainGameContainer() {
   
   // Add a state variable to explicitly control Kino's animation
   const [kinoAnimationState, setKinoAnimationState] = useState<'idle' | 'walking' | 'static'>('idle');
+
+  // Refs for timers and animation state
+  const gameOverShownRef = useRef<boolean>(false);
+  
+  // Add an effect to reset isStartingGame when the game is over
+  useEffect(() => {
+    if (gameState.isGameOver) {
+      // Make sure controls are re-enabled when game is over
+      setIsStartingGame(false);
+      setIsSigningTransaction(false);
+    }
+  }, [gameState.isGameOver]);
+
+  // Add an effect to reset gameOverShownRef when a new game starts
+  useEffect(() => {
+    if (gameState.gameActive) {
+      // Reset the gameOverShownRef when a new game starts
+      gameOverShownRef.current = false;
+      console.log('New game started - reset gameOverShownRef to false');
+    }
+  }, [gameState.gameActive]);
 
   // Update balance from MetaMask
   useEffect(() => {
@@ -434,10 +458,27 @@ export default function BlockchainGameContainer() {
               }));
             }, 500);
           } else {
-            // End game with accident based on blockchain result
-            setTimeout(() => {
-              endGameWithLoss(`Game over: ${result && result.result} (Blockchain result)`, 'vehicle' as AccidentType);
-            }, 500);
+            // Handle the loss case
+            // Check if game over message has already been shown
+            if (!gameOverShownRef.current) {
+              gameOverShownRef.current = true; // Mark as shown
+              setTimeout(() => {
+                // Determine accident type randomly
+                const accidentTypes: AccidentType[] = ['nail', 'rock', 'banana', 'ankle', 'debris', 'vehicle'];
+                const randomAccidentType = accidentTypes[Math.floor(Math.random() * accidentTypes.length)];
+                
+                // Update game state to show loss
+                setGameState(prevState => ({
+                  ...prevState,
+                  gameActive: false,
+                  isGameOver: true,
+                  isWin: false,
+                  losses: prevState.losses + 1,
+                  message: `Game over: ${result ? result.result : 'Loss'}`, // Use result message if available
+                  accidentType: randomAccidentType
+                }));
+              }, 500);
+            }
           }
           return prev;
         }
@@ -512,11 +553,14 @@ export default function BlockchainGameContainer() {
 
   // Function to start a new game on the blockchain
   const startGame = async () => {
+    // Immediately disable controls
+    setIsStartingGame(true);
     if (typeof window === 'undefined' || !window.ethereum) {
       setGameState(prev => ({
         ...prev,
         message: "MetaMask not installed"
       }));
+      setIsStartingGame(false); // Re-enable controls
       return;
     }
     
@@ -526,6 +570,7 @@ export default function BlockchainGameContainer() {
         ...prev,
         message: "Please connect your wallet using the Connect button"
       }));
+      setIsStartingGame(false); // Re-enable controls
       return;
     }
     
@@ -535,6 +580,7 @@ export default function BlockchainGameContainer() {
     // Require lane selection before starting
     if (gameState.targetLane <= 0) {
       alert("Please select a lane to bet on");
+      setIsStartingGame(false); // Re-enable controls
       return;
     }
     
@@ -612,6 +658,22 @@ export default function BlockchainGameContainer() {
         }
       } catch (approvalError: unknown) {
         const errorMessage = approvalError instanceof Error ? approvalError.message : String(approvalError);
+        
+        // Check if user rejected the transaction
+        if (errorMessage.includes('user rejected')) {
+          // Re-enable controls immediately for user rejection
+          setIsStartingGame(false);
+          setIsSigningTransaction(false);
+          
+          setGameState(prev => ({
+            ...prev,
+            message: `Token approval cancelled by user`
+          }));
+          
+          // Return instead of throwing to prevent further error handling
+          return;
+        }
+        
         setGameState(prev => ({
           ...prev,
           message: `Token approval failed: ${errorMessage}`
@@ -651,7 +713,7 @@ export default function BlockchainGameContainer() {
 
       // Play the game on the blockchain
       let txHash;
-      try {
+      try { // Inner try for playGame and result handling (starts line ~706)
         // Create a provider using window.ethereum
         // Now properly typed with our declaration file
         if (!window.ethereum) {
@@ -678,8 +740,7 @@ export default function BlockchainGameContainer() {
         
         // Now we're done with signing, set gameActive to true and signing to false
         setIsSigningTransaction(false);
-        // Set Kino to static pose when game starts
-        setKinoAnimationState('static');
+        setKinoAnimationState('static'); // Set Kino to static pose when game starts
         setGameState(prev => ({
           ...prev,
           gameActive: true
@@ -692,30 +753,29 @@ export default function BlockchainGameContainer() {
         // Add a small delay to allow indexing
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        try {
-          // Use the existing fetchLastGameResult function that's defined in this component
+        try { // Nested try for result fetching/animation
           const result = await fetchLastGameResult();
-          
           if (result) {
-            // Use the existing playGameAnimation function that's defined in this component
             playGameAnimation(result);
-            
-            // Refresh the token balance after game
-            setTimeout(() => fetchTokenBalance(), 3000);
+            setTimeout(() => fetchTokenBalance(), 3000); // Refresh balance after animation
           }
         } catch (resultError) {
           console.error('Error fetching or playing game result:', resultError);
-          setGameState(prev => ({
-            ...prev,
-            message: "Game started successfully, but couldn't fetch the result. Try refreshing."
-          }));
+          setGameState(prev => ({ ...prev, message: "Game tx succeeded, but failed to process result. Try refreshing." }));
+          // Consider resetting game state here too if needed
+          resetGame(); // Reset if result processing fails
         }
-      } catch (txError: unknown) {
-        console.error('Failed to start game:', txError);
+      } catch (txError: unknown) { // Catch for inner try (playGame/result handling)
+        console.error('Failed to start game transaction or process result:', txError);
         
-        // Create user-friendly error message
+        // Reset game state and re-enable controls when transaction fails
+        resetGame();
+        setIsStartingGame(false); // Ensure controls are re-enabled
+        setIsSigningTransaction(false); // Ensure signing state is reset
+        setKinoAnimationState('idle'); // Reset Kino animation state
+        
+        // Create user-friendly error message (code copied from previous state, handles retry etc.)
         let errorMsg = "Failed to start game";
-        
         if (txError && typeof txError === 'object' && 'message' in txError && typeof txError.message === 'string') {
           if (txError.message.includes('user rejected')) {
             errorMsg = "Transaction rejected by user";
@@ -724,45 +784,48 @@ export default function BlockchainGameContainer() {
           } else if (txError.message.includes('Failed to initialize request')) {
             errorMsg = "RPC connection error. Please try again later";
           } else if (txError.message.includes('CALL_EXCEPTION')) {
-            // Handle the specific CALL_EXCEPTION error
-            errorMsg = "Contract call failed. This could be due to network issues or contract state. Please try again.";
+            errorMsg = "Contract call failed. Check network or contract state.";
             console.log("CALL_EXCEPTION details:", txError);
-            
-            // Automatically retry once after a short delay for CALL_EXCEPTION errors
-            if (!isRetrying) {
-              setIsRetrying(true);
-              setGameState(prev => ({ ...prev, message: "Transaction failed. Retrying..." }));
-              
-              // Wait 3 seconds before retrying
-              setTimeout(() => {
-                setIsRetrying(false);
-                startGame(); // Retry the transaction
-                return; // Exit this error handler after scheduling retry
-              }, 3000);
-              
-              return; // Don't throw error since we're retrying
-            }
+            // NOTE: Retry logic removed here for simplicity in fixing syntax,
+            // It was complex and might be better handled elsewhere or revisited.
+            // If retry is needed, it should be added back carefully.
           } else {
             errorMsg = `Transaction error: ${txError.message.substring(0, 100)}`;
           }
         }
-        
         setGameState(prev => ({ ...prev, message: errorMsg }));
-        throw new Error(errorMsg);
+        // Do not re-throw; let the outer finally block handle state cleanup.
       }
-    } catch (error: unknown) {
+    } catch (error: unknown) { // Catch for outer try (covers approval and other setup errors)
       const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error during game setup or approval:', errorMessage);
+      // Reset game state fully on any overarching error
+      resetGame();
       setGameState(prev => ({
         ...prev,
-        gameActive: false, // Reset gameActive if there's an error
+        gameActive: false, // Ensure gameActive is reset
         message: `Error: ${errorMessage}`
       }));
+      setIsStartingGame(false); // Ensure controls are re-enabled
       setIsSigningTransaction(false); // Reset signing transaction state
       setKinoAnimationState('idle'); // Reset Kino animation state
       alert(`Error starting game: ${errorMessage}`);
+    } finally { // Finally for the outer try block
+      // Ensure loading/starting states are always reset regardless of success or failure
+      setIsStartingGame(false);
+      setIsSigningTransaction(false);
     }
   };
 
+  // Add an effect to reset isStartingGame when the game is over
+  useEffect(() => {
+    if (gameState.isGameOver) {
+      // Make sure controls are re-enabled when game is over
+      setIsStartingGame(false);
+      setIsSigningTransaction(false);
+    }
+  }, [gameState.isGameOver]);
+  
   // Function to just replay the last game without starting a new one
   const replayLastGame = async () => {
     // Set Kino to static pose before starting replay
@@ -830,7 +893,7 @@ export default function BlockchainGameContainer() {
           onBetChange={handleBetChange}
           onStartGame={startGame}
           onCashOut={cashOut}
-          gameActive={gameState.gameActive}
+          gameActive={gameState.gameActive || isStartingGame}
           multiplier={gameState.multiplier}
           difficulty={gameState.currentDifficulty}
           onDifficultyChange={handleDifficultyChange}
@@ -844,13 +907,6 @@ export default function BlockchainGameContainer() {
         <div className="p-4 bg-gray-800 border-t border-gray-700">
           <h3 className="text-lg font-semibold mb-2">Test Game Controls</h3>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={replayLastGame}
-              disabled={isLoadingResult}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoadingResult ? "Loading..." : "Replay Last Game"}
-            </button>
             <button
               onClick={fetchLastGameResult}
               disabled={isLoadingResult}

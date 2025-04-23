@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ethers } from 'ethers';
 
-interface ConnectMetaMaskButtonProps {
+interface ConnectButtonProps {
   onConnect: (account: string, provider: ethers.providers.Web3Provider) => void;
   onError: (error: Error) => void;
   onDisconnect?: () => void;
@@ -9,7 +9,7 @@ interface ConnectMetaMaskButtonProps {
   className?: string;
 }
 
-export const ConnectMetaMaskButton: React.FC<ConnectMetaMaskButtonProps> = ({ 
+export const ConnectButton: React.FC<ConnectButtonProps> = ({ 
   onConnect, 
   onError,
   onDisconnect,

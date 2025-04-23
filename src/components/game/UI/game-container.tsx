@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useAccount, useBalance } from "wagmi";
 import { GameDifficulty } from "../GameDifficulty";
 import { getTokenContract, getGameContract } from "../simple-contracts";
 import { ethers } from "ethers";
@@ -15,22 +14,23 @@ import { DifficultyType, GameState, DifficultySettings, AccidentType } from "../
 
 import { gameAbi } from '../../../contracts/abis/game-abi';
 
+
+
 interface GameContainerProps {
   isDemoMode: boolean;
 }
 
 export default function GameContainer({ isDemoMode }: GameContainerProps) {
-  const { address, isConnected } = useAccount();
-  const { data: walletBalance } = useBalance({
-    address,
-    token: TOKEN_ADDRESS,
-  });
+  // Direct MetaMask integration instead of wagmi
+  const [metaMaskAccount, setMetaMaskAccount] = useState<string | null>(null);
+  const [metaMaskProvider, setMetaMaskProvider] = useState<ethers.providers.Web3Provider | null>(null);
+  const [metaMaskBalance, setMetaMaskBalance] = useState<string>('0');
+  const isConnected = !!metaMaskAccount;
   // Not using Abstract AGW contracts anymore, will create direct MetaMask contracts when needed
   
-  // Auto-walk timer reference
+  // Refs for timers and animation state
   const autoWalkTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Flag to prevent multiple win triggers
+  const gameOverShownRef = useRef<boolean>(false); 
   const winTriggeredRef = useRef<boolean>(false);
   
   // Demo mode is now passed as a prop
@@ -64,13 +64,13 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
         ...prev,
         balance: prev.balance || 1000
       }));
-    } else if (walletBalance) {
+    } else if (metaMaskBalance) {
       setGameState(prev => ({
         ...prev,
-        balance: parseFloat(walletBalance.formatted)
+        balance: parseFloat(metaMaskBalance)
       }));
     }
-  }, [walletBalance, isDemoMode]);
+  }, [metaMaskBalance, isDemoMode]);
   
   // Clean up auto-walk timer when component unmounts
   useEffect(() => {
@@ -84,6 +84,9 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
 
   // Reset game state
   const resetGame = () => {
+    // Reset game over shown ref
+    gameOverShownRef.current = false;
+    
     // Clear any existing auto-walk timer
     if (autoWalkTimerRef.current) {
       clearInterval(autoWalkTimerRef.current);
@@ -252,7 +255,7 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
       console.log('Game Address (Spender):', GAME_ADDRESS);
       console.log('Bet Amount (Original):', gameState.betAmount);
       console.log('Bet Amount (Token Units):', betAmountInTokenUnits.toString());
-      console.log('Player Address:', address);
+      console.log('Player Address:', metaMaskAccount);
       
       // Update message to user
       setGameState(prev => ({
@@ -341,7 +344,7 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
             try {
               // Try to get the last game result for the current player
               // This might fail if there's no previous result, which is fine
-              const lastResult = await gameContract.getLastGameResult(address);
+              const lastResult = await gameContract.getLastGameResult(metaMaskAccount);
               console.log('Previous game result found:', lastResult);
             } catch (checkError) {
               console.log('No previous game results found or error checking:', checkError);
@@ -591,7 +594,7 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
   };
   
   // Create a ref to track if a collision check is in progress
-  const collisionCheckInProgressRef = useRef(false);
+  const collisionCheckInProgressRef = useRef<boolean>(false);
 
   // Play blockchain game animation based on the blockchain result
   const playBlockchainGameAnimation = (blockchainResult: {
@@ -655,7 +658,16 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
         // Show loss immediately
         const crashSound = new Audio('https://www.soundjay.com/mechanical/sounds/car-crash-1.mp3');
         crashSound.play().catch(e => console.log('Error playing sound:', e));
-        endGameWithLoss(`Game over: ${blockchainResult.result} (Blockchain result)`, 'vehicle' as AccidentType);
+        // Only show game over message if we haven't shown one yet for this game session
+        if (!gameOverShownRef.current) {
+          gameOverShownRef.current = true;
+          
+          // Determine accident type randomly
+          const accidentTypes: AccidentType[] = ['nail', 'rock', 'banana', 'ankle', 'debris', 'vehicle'];
+          const randomAccidentType = accidentTypes[Math.floor(Math.random() * accidentTypes.length)];
+          
+          endGameWithLoss(`Game over: ${blockchainResult.result}`, randomAccidentType);
+        }
       }
       return;
     }
@@ -703,7 +715,16 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
             
             // End game with accident based on blockchain result
             setTimeout(() => {
-              endGameWithLoss(`Game over: ${blockchainResult.result} (Blockchain result)`, 'vehicle' as AccidentType);
+              // Only show game over message if we haven't shown one yet for this game session
+              if (!gameOverShownRef.current) {
+                gameOverShownRef.current = true;
+                
+                // Determine accident type randomly
+                const accidentTypes: AccidentType[] = ['nail', 'rock', 'banana', 'ankle', 'debris', 'vehicle'];
+                const randomAccidentType = accidentTypes[Math.floor(Math.random() * accidentTypes.length)];
+                
+                endGameWithLoss(`Game over: ${blockchainResult.result}`, randomAccidentType);
+              }
             }, 500);
           }
           return prev;
@@ -955,7 +976,7 @@ export default function GameContainer({ isDemoMode }: GameContainerProps) {
       // In a real implementation, we would check the blockchain result
       console.log('=== GAME COMPLETED ===');
       console.log('Game Address:', GAME_ADDRESS);
-      console.log('Player Address:', address);
+      console.log('Player Address:', metaMaskAccount);
       console.log('Final Lane:', gameState.currentLane);
       console.log('Target Lane:', gameState.targetLane);
       console.log('Final Payout:', winAmount);
